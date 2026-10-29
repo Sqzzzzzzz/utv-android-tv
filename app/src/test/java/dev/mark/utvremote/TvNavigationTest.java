@@ -139,6 +139,7 @@ public final class TvNavigationTest {
         } finally { controller.pause().stop().destroy(); }
     }
     @Test public void homeOffersBothShowsAndLaunchesTheChosenOneWithTheRemote() {
+        RuntimeEnvironment.getApplication().getSharedPreferences("watch",0).edit().putBoolean("autoCheckUpdates",false).commit();
         ActivityController<ShowSelectionActivity> controller = Robolectric.buildActivity(ShowSelectionActivity.class).setup().visible();
         try {
             ShowSelectionActivity activity = controller.get(); View root = activity.getWindow().getDecorView();

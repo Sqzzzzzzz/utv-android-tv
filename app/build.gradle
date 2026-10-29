@@ -7,8 +7,8 @@ android {
         applicationId 'dev.mark.utvremote'
         minSdk 26
         targetSdk 35
-        versionCode 17
-        versionName '0.5.0'
+        versionCode 18
+        versionName '0.6.0'
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
@@ -19,14 +19,14 @@ android {
     }
     // CI validates builds with an ephemeral Android debug key; it cannot sign TV updates.
     if (project.findProperty('utv.ci') != 'true') {
-        signingConfigs {
-            debug {
-                storeFile rootProject.file('signing/prototype-debug.keystore')
-                storePassword 'android'
-                keyAlias 'AndroidDebugKey'
-                keyPassword 'android'
-            }
+    signingConfigs {
+        debug {
+            storeFile rootProject.file('signing/prototype-debug.keystore')
+            storePassword 'android'
+            keyAlias 'AndroidDebugKey'
+            keyPassword 'android'
         }
+    }
     }
     testOptions {
         unitTests.returnDefaultValues = true
