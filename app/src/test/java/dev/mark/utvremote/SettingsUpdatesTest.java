@@ -28,6 +28,9 @@ public final class SettingsUpdatesTest {
     private SharedPreferences prefs;
     @Before public void setup() {
         prefs = RuntimeEnvironment.getApplication().getSharedPreferences("watch", 0); prefs.edit().clear().commit();
+        // Robolectric assigns a new data directory per test; AndroidX retains this static path cache.
+        Map<?, ?> providerPaths = ReflectionHelpers.getStaticField(androidx.core.content.FileProvider.class, "sCache");
+        providerPaths.clear();
     }
     private void launch(boolean incomingUpdate) throws Exception {
         Intent intent = new Intent(RuntimeEnvironment.getApplication(), SettingsActivity.class).putExtra("downloadUpdate", incomingUpdate);
@@ -36,12 +39,14 @@ public final class SettingsUpdatesTest {
         ReflectionHelpers.setField(activity, "network", queue); ReflectionHelpers.setField(activity, "repository", repository);
         controller.setup().visible();
         PackageManager pm = activity.getPackageManager();
-        PackageInfo installed = pm.getPackageInfo(activity.getPackageName(), 0);
+        PackageInfo installed = pm.getPackageInfo(activity.getPackageName(), PackageManager.GET_PROVIDERS | PackageManager.GET_META_DATA);
         installed.versionCode = 18; installed.signingInfo = null; installed.signatures = new Signature[]{new Signature("1234")};
         Shadows.shadowOf(pm).installPackage(installed); Shadows.shadowOf(pm).setCanRequestPackageInstalls(true);
     }
     @After public void cleanup() {
         if (controller != null) { activity.finish(); if (ReflectionHelpers.<Boolean>getField(activity, "resumed")) controller.pause(); controller.stop().destroy(); }
+        Map<?, ?> providerPaths = ReflectionHelpers.getStaticField(androidx.core.content.FileProvider.class, "sCache");
+        providerPaths.clear();
     }
     @Test public void incomingUpdateWaitsForForegroundBeforeDownloadAndInstaller() throws Exception {
         launch(true); assertEquals(1, queue.tasks.size()); assertFalse(activity.getIntent().hasExtra("downloadUpdate"));
@@ -49,6 +54,7 @@ public final class SettingsUpdatesTest {
         controller.resume(); assertEquals(1, queue.tasks.size()); controller.pause(); queue.complete();
         assertEquals(1, repository.downloads); assertNoInstaller();
         File apk = ReflectionHelpers.getField(activity, "verifiedFile"); assertTrue(apk.isFile());
+        assertEquals("content", androidx.core.content.FileProvider.getUriForFile(activity, activity.getPackageName()+".updates", apk).getScheme());
         controller.resume(); Shadows.shadowOf(Looper.getMainLooper()).idle(); Intent install = Shadows.shadowOf(activity).getNextStartedActivity();
         assertNotNull(((TextView)ReflectionHelpers.getField(activity, "status")).getText().toString(), install); assertEquals(Intent.ACTION_VIEW, install.getAction());
         assertEquals("content", install.getData().getScheme()); assertEquals("application/vnd.android.package-archive", install.getType());
