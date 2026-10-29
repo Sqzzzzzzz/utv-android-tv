@@ -110,6 +110,7 @@ public final class UiPreviewTest {
                 .putLong("position:"+firstMama,1080000).putLong("position:"+firstSynok,600000)
                 .putStringSet("newEpisodes",new java.util.HashSet<>(java.util.Collections.singleton(secondMama))).commit();
         new WatchState(prefs).mark(Show.MAMENKIN,secondSynok,true);
+        RuntimeEnvironment.getApplication().getSharedPreferences("watch",0).edit().putBoolean("autoCheckUpdates",false).commit();
         ActivityController<ShowSelectionActivity> home=Robolectric.buildActivity(ShowSelectionActivity.class).setup().visible();
         Intent chosen;
         try {

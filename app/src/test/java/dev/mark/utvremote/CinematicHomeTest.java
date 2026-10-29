@@ -18,7 +18,7 @@ import static org.junit.Assert.*;
 public final class CinematicHomeTest {
  private android.content.SharedPreferences prefs(){return RuntimeEnvironment.getApplication().getSharedPreferences("watch",0);}
  private void key(Activity activity,int code){activity.dispatchKeyEvent(new android.view.KeyEvent(0,code));activity.dispatchKeyEvent(new android.view.KeyEvent(1,code));}
- @Before public void clear(){prefs().edit().clear().commit();}
+ @Before public void clear(){prefs().edit().clear().putBoolean("autoCheckUpdates",false).commit();}
  @Test public void focusUpdatesHeroAndResumeBelongsToSelectedShow() throws Exception {
   String mama=Show.MAMA.url()+"episodes/1/",synok=Show.MAMENKIN.url()+"episodes/2/";
   prefs().edit().putString("lastUrl",mama).putString(Show.MAMENKIN.key("lastUrl"),synok).putLong("position:"+synok,42000).commit();

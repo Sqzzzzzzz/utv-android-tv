@@ -20,7 +20,7 @@ public final class NewFeaturesTest {
     private SharedPreferences prefs;
     private WatchState watch;
     private static final String ONE = Show.MAMA.url()+"episodes/1/", TWO=Show.MAMA.url()+"episodes/2/";
-    @Before public void setup() { prefs=RuntimeEnvironment.getApplication().getSharedPreferences("watch",0);prefs.edit().clear().commit();watch=new WatchState(prefs); }
+    @Before public void setup() { prefs=RuntimeEnvironment.getApplication().getSharedPreferences("watch",0);prefs.edit().clear().putBoolean("autoCheckUpdates",false).commit();watch=new WatchState(prefs); }
     private CatalogRepository.Episode episode(String url) { return new CatalogRepository.Episode(1,1,url,"","60 мин",""); }
     private String catalog() { return "[{\"s\":1,\"n\":1,\"u\":\""+ONE+"\"},{\"s\":1,\"n\":2,\"u\":\""+TWO+"\"}]"; }
     @Test public void firstCatalogIsBaselineAndNewEpisodesStayNewUntilPlayback() {

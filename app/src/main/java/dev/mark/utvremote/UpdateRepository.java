@@ -8,7 +8,13 @@ import java.security.MessageDigest;
 import java.util.Locale;
 
 /** HTTPS release manifest and bounded downloads; package/signature checks happen before install. */
-final class UpdateRepository {
+class UpdateRepository {
+    static final String DEFAULT_SOURCE = "https://raw.githubusercontent.com/Sqzzzzzzz/utv-android-tv-updates/main/release.json";
+    static String source(android.content.SharedPreferences prefs) {
+        String value = prefs.getString("updateSource", "").trim();
+        return value.isEmpty() ? DEFAULT_SOURCE : value;
+    }
+    interface Progress { void onProgress(long bytes, long total); }
     static final int MAX_APK = 50 * 1024 * 1024;
     static final class Release {
         final int code;
@@ -38,7 +44,8 @@ final class UpdateRepository {
             if (!https(url)) throw new IOException("Источник обновления должен использовать HTTPS.");
             HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
             c.setInstanceFollowRedirects(false); c.setConnectTimeout(15000); c.setReadTimeout(20000);
-            c.setRequestProperty("User-Agent", "UTVRemote-update/0.2");
+            c.setRequestProperty("User-Agent", "UTV-update/0.6");
+            c.setRequestProperty("Cache-Control", "no-cache");
             int status;
             try { status = c.getResponseCode(); } catch (IOException ex) { c.disconnect(); throw ex; }
             if (status == 200) return c;
@@ -56,21 +63,36 @@ final class UpdateRepository {
             copy(input, out, 65536); return parse(out.toString(StandardCharsets.UTF_8.name()));
         } finally { c.disconnect(); }
     }
-    void download(Release release, File target) throws Exception {
+    void download(Release release, File target) throws Exception { download(release, target, null); }
+    void download(Release release, File target, Progress progress) throws Exception {
+        boolean verified = false;
         HttpURLConnection c = connect(release.url);
-        try (InputStream in = c.getInputStream(); OutputStream out = new FileOutputStream(target)) { copy(in, out, MAX_APK); }
-        catch (Exception ex) { target.delete(); throw ex; }
-        finally { c.disconnect(); }
-        if (!digest(target).equals(release.sha256)) { target.delete(); throw new IOException("Файл обновления повреждён. Загрузи его повторно."); }
+        try {
+            long length = c.getContentLengthLong();
+            if (length > MAX_APK) throw new IOException("Файл превышает допустимый размер.");
+            try (InputStream in = c.getInputStream(); OutputStream out = new FileOutputStream(target)) {
+                copy(in, out, MAX_APK, length, progress);
+            }
+            if (!digest(target).equals(release.sha256)) throw new IOException("Файл обновления повреждён. Загрузи его повторно.");
+            verified = true;
+        } finally { c.disconnect(); if (!verified) target.delete(); }
     }
     static void copy(InputStream in, OutputStream out, long limit) throws IOException {
-        byte[] buffer = new byte[16384]; long total = 0; int length;
+        copy(in, out, limit, -1, null);
+    }
+    static void copy(InputStream in, OutputStream out, long limit, long expected, Progress progress) throws IOException {
+        byte[] buffer = new byte[16384]; long total = 0, last = android.os.SystemClock.elapsedRealtime(); int length;
+        if (progress != null) progress.onProgress(0, expected);
         while ((length = in.read(buffer)) != -1) {
             if (Thread.currentThread().isInterrupted()) throw new InterruptedIOException("Загрузка отменена.");
             total += length; if (total > limit) throw new IOException("Файл превышает допустимый размер.");
             out.write(buffer, 0, length);
+            long now = android.os.SystemClock.elapsedRealtime();
+            if (progress != null && now - last >= 150) { progress.onProgress(total, expected); last = now; }
         }
         if (total == 0) throw new IOException("Получен пустой файл.");
+        if (expected >= 0 && total != expected) throw new IOException("Загрузка не завершена. Повтори попытку.");
+        if (progress != null) progress.onProgress(total, expected);
     }
     static String digest(File file) throws Exception {
         MessageDigest hash = MessageDigest.getInstance("SHA-256");

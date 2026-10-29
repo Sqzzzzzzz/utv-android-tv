@@ -13,6 +13,8 @@ import java.util.List;
 
 /** Cinematic, remote-first launcher for the two supported shows. */
 public final class ShowSelectionActivity extends Activity {
+    private final java.util.concurrent.ExecutorService updateNetwork = java.util.concurrent.Executors.newSingleThreadExecutor();
+    private UpdatePrompt updatePrompt;
     private final List<View> cards = new ArrayList<>();
     private Show selected;
     private ImageView hero;
@@ -93,6 +95,7 @@ public final class ShowSelectionActivity extends Activity {
         primary.setNextFocusUpId(settings.getId());primary.setNextFocusLeftId(primary.getId());primary.setNextFocusRightId(primary.getId());
         settings.setNextFocusDownId(primary.getId());settings.setNextFocusUpId(settings.getId());settings.setNextFocusLeftId(settings.getId());settings.setNextFocusRightId(settings.getId());
         setContentView(root);select(selected);selectedCard().requestFocus();
+        updatePrompt = new UpdatePrompt(this, updateNetwork, new UpdateRepository(), this::cancelPress);
     }
     private View pressedControl;
     @Override public boolean dispatchKeyEvent(android.view.KeyEvent event) {
@@ -120,7 +123,8 @@ public final class ShowSelectionActivity extends Activity {
         return super.dispatchKeyEvent(event);
     }
     private void cancelPress(){if(pressedControl!=null){pressedControl.setPressed(false);pressedControl=null;}}
-    @Override protected void onPause(){cancelPress();super.onPause();}
+    @Override protected void onPause(){cancelPress();if(updatePrompt!=null)updatePrompt.pause();super.onPause();}
+    @Override protected void onDestroy(){updateNetwork.shutdownNow();super.onDestroy();}
     private GradientDrawable outline() { GradientDrawable d=TvUi.shape(this,Color.TRANSPARENT,TvUi.MAGENTA);return d; }
     private void stylePrimary() {
         GradientDrawable d=TvUi.shape(this,primary.isFocused()?Color.WHITE:0xFFF3F1ED,primary.isFocused()?TvUi.MAGENTA:0);
@@ -139,5 +143,5 @@ public final class ShowSelectionActivity extends Activity {
         getSharedPreferences("watch",MODE_PRIVATE).edit().putString("selectedShow",show.slug).apply();
     }
     private void openShow(Show show) {startActivity(new Intent(this,MainActivity.class).putExtra("show",show.slug));}
-    @Override protected void onResume() {super.onResume();TvUi.fullscreen(this);if(primary!=null)select(selected);}
+    @Override protected void onResume() {super.onResume();TvUi.fullscreen(this);if(primary!=null)select(selected);if(updatePrompt!=null)updatePrompt.resume(System.currentTimeMillis());}
 }
