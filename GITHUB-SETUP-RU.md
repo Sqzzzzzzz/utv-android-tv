@@ -33,6 +33,14 @@
 
 Проверки выполняются на GitHub Actions и зависят от доступных минут/лимитов аккаунта.
 
+## Подтверждённая проверка настройки
+
+29 октября 2026 года проверен запуск [Android checks](https://github.com/Sqzzzzzzz/utv-android-tv/actions/runs/40862807844): 82 теста прошли, один необязательный тест пропущен, ошибок lint нет, предупреждений — 47.
+
+После обновления GitHub Actions до поддерживаемых версий Node 24 [повторная сборка](https://github.com/Sqzzzzzzz/utv-android-tv/actions/runs/40863553494) также завершилась успешно. [Ревью Codex](https://github.com/Sqzzzzzzz/utv-android-tv/pull/2#issuecomment-6495148401) не выявило серьёзных проблем.
+
+Эти результаты подтверждают проверку конкретных коммитов. Для нового pull request проверяй свежий запуск Android checks и поле Review trigger в ответе Codex: оно показывает, запущено ли ревью автоматически или вручную.
+
 ## Официальная документация
 
 - https://developers.openai.com/codex/integrations/github
