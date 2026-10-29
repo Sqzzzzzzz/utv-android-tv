@@ -295,9 +295,16 @@ public final class MainActivity extends Activity {
         watch.mark(show, e.url, !watch.watched(e.url)); updateCard(card); updateResume();
     }
     private void episodeActions(CatalogRepository.Episode e, View card) {
+        List<String> actions = new ArrayList<>();
+        actions.add("Смотреть");
+        actions.add(watch.watched(e.url) ? "Снять отметку просмотра" : "Отметить просмотренным");
+        if (prefs.getLong("position:" + e.url, 0) > 0) actions.add("Сбросить время просмотра");
         new android.app.AlertDialog.Builder(this).setTitle(e.title())
-                .setItems(new String[]{"Смотреть", watch.watched(e.url) ? "Снять отметку просмотра" : "Отметить просмотренным"},
-                        (dialog, which) -> { if (which == 0) play(e); else toggleWatched(e, card); }).show();
+                .setItems(actions.toArray(new String[0]), (dialog, which) -> {
+                    if (which == 0) play(e);
+                    else if (which == 1) toggleWatched(e, card);
+                    else { watch.resetProgress(show, e.url); updateCard(card); updateResume(); }
+                }).show();
     }
     private void saveCatalog() {
         JSONArray array = new JSONArray();
