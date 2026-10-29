@@ -1,0 +1,59 @@
+name: Publish verified APK 0.5.0
+
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/release-0.5.0.yml]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: release-0.5.0
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.repository == 'Sqzzzzzzz/utv-android-tv' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      APK_SHA256: f2b97849901f3e978d8ff6469f76a0b479562cacea8e03d6dce68625c3b7b9b4
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Reassemble and verify the original signed APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view v0.5.0 --repo "$GH_REPO" >/dev/null 2>&1; then
+            echo "::error::Release v0.5.0 already exists; refusing to overwrite it."
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/utv-release"
+          cd "$RUNNER_TEMP/utv-release"
+          : > utv-0.5.0.apk
+          gh api "repos/$GH_REPO/git/blobs/58ad5e0b384661c09e7daf07b022387bdc5cb262" -H 'Accept: application/vnd.github.raw+json' >> utv-0.5.0.apk
+          gh api "repos/$GH_REPO/git/blobs/1ca16791b8267fba857db3a246c5a9fb69319299" -H 'Accept: application/vnd.github.raw+json' >> utv-0.5.0.apk
+          gh api "repos/$GH_REPO/git/blobs/159e908685620f86b5cab3c9c7b7a9473543fba8" -H 'Accept: application/vnd.github.raw+json' >> utv-0.5.0.apk
+          gh api "repos/$GH_REPO/git/blobs/4c37e6707e553360cc27c3afef6a8c4813e33f01" -H 'Accept: application/vnd.github.raw+json' >> utv-0.5.0.apk
+          printf '%s  utv-0.5.0.apk\n' "$APK_SHA256" > SHA256SUMS
+          sha256sum --check SHA256SUMS
+      - name: Upload and publish the requested release
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create v0.5.0 "$RUNNER_TEMP/utv-release/utv-0.5.0.apk" "$RUNNER_TEMP/utv-release/SHA256SUMS" --repo "$GH_REPO" --draft --title 'Ю 0.5.0' --target 3afd0b01309850eb8968437d01f98dbd3799c295 --notes-file .github/release-notes/0.5.0.md
+          gh release edit v0.5.0 --repo "$GH_REPO" --draft=false --latest
+      - name: Verify the published APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release download v0.5.0 --repo "$GH_REPO" --pattern utv-0.5.0.apk --dir "$RUNNER_TEMP/published-apk"
+          printf '%s  %s\n' "$APK_SHA256" "$RUNNER_TEMP/published-apk/utv-0.5.0.apk" | sha256sum --check -
+          gh release view v0.5.0 --repo "$GH_REPO" --json url,tagName,isDraft,isPrerelease,assets
