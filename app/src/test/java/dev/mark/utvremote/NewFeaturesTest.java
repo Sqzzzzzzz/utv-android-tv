@@ -137,6 +137,34 @@ public final class NewFeaturesTest {
             assertFalse(watch.watched(ONE));assertNull(Shadows.shadowOf(c.get()).peekNextStartedActivity());
         } finally {c.pause().stop().destroy();}
     }
+    @Test public void resetTimeRemovesResumeButKeepsOtherEpisodeShowAndWatchedState() {
+        String other=Show.MAMENKIN.url()+"episodes/1/";
+        prefs.edit().putString("lastUrl",ONE).putString("lastTitle","one").putLong("position:"+ONE,62000)
+                .putLong("duration:"+ONE,3600000).putLong("position:"+TWO,44000)
+                .putString(Show.MAMENKIN.key("lastUrl"),other).putLong("position:"+other,55000).putBoolean("watched:"+TWO,true).commit();
+        watch.resetProgress(Show.MAMA,ONE);
+        assertFalse(prefs.contains("position:"+ONE));assertEquals("",watch.resumeUrl(Show.MAMA));assertFalse(prefs.contains("lastTitle"));
+        assertEquals(0,watch.progress(ONE,"60 мин"));assertEquals(3600000,prefs.getLong("duration:"+ONE,0));
+        assertEquals(44000,prefs.getLong("position:"+TWO,0));assertTrue(watch.watched(TWO));
+        assertEquals(other,watch.resumeUrl(Show.MAMENKIN));assertEquals(55000,prefs.getLong("position:"+other,0));
+        watch.resetProgress(Show.MAMA,other);assertEquals(55000,prefs.getLong("position:"+other,0));
+    }
+    @Test public void episodeMenuResetsTimeAndRefreshesCardWithoutPlayback() {
+        prefs.edit().putString("catalog",catalog()).putString("lastUrl",ONE).putLong("position:"+ONE,62000).commit();
+        ActivityController<MainActivity> c=Robolectric.buildActivity(MainActivity.class);
+        org.robolectric.util.ReflectionHelpers.setField(c.get(),"network",new OfflineExecutor());c.setup().visible();
+        try {
+            LinearLayout grid=org.robolectric.util.ReflectionHelpers.getField(c.get(),"grid");View card=((ViewGroup)grid.getChildAt(0)).getChildAt(0);
+            card.performLongClick();android.app.AlertDialog dialog=org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();
+            assertEquals("Сбросить время просмотра",dialog.getListView().getAdapter().getItem(2));dialog.getListView().performItemClick(null,2,2);
+            assertEquals(0,prefs.getLong("position:"+ONE,0));
+            assertFalse(((TextView)((ViewGroup)card).getChildAt(2)).getText().toString().contains("Продолжить"));
+            assertEquals(0,((ProgressBar)((ViewGroup)card).getChildAt(3)).getProgress());
+            Button resume=org.robolectric.util.ReflectionHelpers.getField(c.get(),"resume");assertEquals(View.GONE,resume.getVisibility());
+            assertNull(Shadows.shadowOf(c.get()).peekNextStartedActivity());
+            card.performLongClick();assertEquals(2,org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog().getListView().getCount());
+        }finally{c.pause().stop().destroy();}
+    }
     @Test public void updateProviderSharesOnlyTheUpdateCache() throws Exception {
         Context app=RuntimeEnvironment.getApplication();File dir=new File(app.getCacheDir(),"updates");dir.mkdirs();File apk=new File(dir,"pending.apk");
         try {

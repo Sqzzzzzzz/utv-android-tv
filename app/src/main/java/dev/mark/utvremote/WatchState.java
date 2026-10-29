@@ -24,6 +24,14 @@ final class WatchState {
         if (watched) edit.putLong("position:" + url, 0);
         edit.apply();
     }
+    void resetProgress(Show show, String url) {
+        if (Show.fromUrl(url) != show) return;
+        boolean resume = url.equals(resumeUrl(show));
+        SharedPreferences.Editor edit = prefs.edit().remove("position:" + url);
+        if (resume || url.equals(prefs.getString(show.key("lastUrl"), "")))
+            edit.remove(show.key("lastUrl")).remove(show.key("lastTitle"));
+        edit.apply();
+    }
     void catalogUpdated(Show show, List<CatalogRepository.Episode> episodes) {
         Set<String> known = new HashSet<>(prefs.getStringSet(show.key("knownEpisodes"), new HashSet<>()));
         boolean initialized = prefs.getBoolean(show.key("knownInitialized"), false);
