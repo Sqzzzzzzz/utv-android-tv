@@ -46,6 +46,7 @@ public final class PlaybackActivity extends Activity {
     private TextView durationText;
     private SeekPreview seekPreview;
     private boolean seeking, seekWasPlaying, dialogOpen;
+    private EpisodePicker episodePicker;
     private View pressedButton;
     private long seekOrigin, seekTarget;
     private final Runnable hideTransport = () -> {
@@ -364,6 +365,7 @@ public final class PlaybackActivity extends Activity {
         handler.postDelayed(saveTick, 5000); handler.post(progressTick);
     }
     @Override protected void onPause() {
+        if(episodePicker!=null)episodePicker.dismiss();
         cancelAutoNext(); cancelSeek(); cancelButtonPress(); handler.removeCallbacks(hideTransport); rememberPlayback(); pausedByLifecycle = true; resumed = false;
         if (player != null) player.pause();
         if (playerView != null) updateKeepScreenOn();
@@ -550,23 +552,11 @@ public final class PlaybackActivity extends Activity {
         return null;
     }
     private void chooseEpisode() {
-        List<String> urls = new ArrayList<>(), labels = new ArrayList<>(); int selected = 0;
-        try {
-            org.json.JSONArray list = new org.json.JSONArray(prefs.getString(show.key("catalog"), "[]"));
-            for (int i = 0; i < list.length(); i++) {
-                org.json.JSONObject episode = list.getJSONObject(i); String url = episode.getString("u");
-                if (Show.fromUrl(url) != show) continue;
-                if (url.equals(episodeUrl)) selected = urls.size();
-                urls.add(url); labels.add(episode.getInt("s") + " сезон · " + episode.getInt("n") + " серия"
-                        + (url.equals(episodeUrl) ? " · Сейчас" : ""));
-            }
-        } catch (org.json.JSONException ignored) { }
-        dialogOpen = true; showTransport(false);
-        android.app.AlertDialog dialog = new android.app.AlertDialog.Builder(this).setTitle("Серии · " + show.title)
-                .setSingleChoiceItems(labels.toArray(new String[0]), selected, (choice, index) -> {
-                    choice.dismiss(); if (!urls.get(index).equals(episodeUrl)) openEpisode(urls.get(index), watch.title(show, urls.get(index)));
-                }).setNegativeButton("Назад", null).create();
-        dialog.setOnDismissListener(d -> { dialogOpen = false; showTransport(true); }); dialog.show();
+        if(episodePicker!=null && episodePicker.isShowing())return;
+        cancelButtonPress();dialogOpen=true;showTransport(false);
+        episodePicker=new EpisodePicker(this,show,episodeUrl,watch,url->openEpisode(url,watch.title(show,url)));
+        episodePicker.setOnDismissListener(d->{episodePicker=null;dialogOpen=false;showTransport(true);});
+        episodePicker.show();
     }
     private void openEpisode(String url, String episodeTitle) {
         if (launchingNext || Show.fromUrl(url) != show) return;

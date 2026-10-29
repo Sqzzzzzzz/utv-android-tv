@@ -371,9 +371,11 @@ public final class PlaybackActivityTest {
             list.put(new org.json.JSONObject().put("u",next).put("s",6).put("n",2));
             prefs().edit().putString("catalog",list.toString()).commit();
             ReflectionHelpers.callInstanceMethod(c.get(), "chooseEpisode");
-            android.app.AlertDialog dialog = org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();
-            assertEquals(2, dialog.getListView().getCount()); assertEquals(0, dialog.getListView().getCheckedItemPosition());
-            dialog.getListView().performItemClick(null,1,1);
+            org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
+            EpisodePicker dialog=ReflectionHelpers.getField(c.get(),"episodePicker");
+            LinearLayout cards=ReflectionHelpers.getField(dialog,"cards");assertEquals(2,cards.getChildCount());
+            assertEquals("episode:"+URL,dialog.getWindow().getDecorView().findFocus().getTag());
+            cards.getChildAt(1).performClick();
             Intent intent = org.robolectric.Shadows.shadowOf(c.get()).getNextStartedActivity();
             assertEquals(next,intent.getStringExtra("url")); assertEquals(185000,prefs().getLong("position:"+URL,-1));
         } finally { c.pause().stop().destroy(); }
