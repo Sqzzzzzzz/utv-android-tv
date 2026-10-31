@@ -17,6 +17,8 @@ final class NetworkDiagnostics {
             if (e instanceof SocketTimeoutException) return "TIMEOUT";
             if (e instanceof ConnectException) return "CONNECT";
             if (e instanceof SiteHttp.ResponseTooLargeException) return "RESPONSE_SIZE";
+            if (e instanceof CatalogRepository.PlayerUnavailableException) return "PLAYER_NOT_FOUND";
+            if (e instanceof CatalogRepository.StreamUnavailableException) return "STREAM_NOT_FOUND";
             if (e instanceof CatalogRepository.CatalogException) return "CATALOG_FORMAT";
             if (e instanceof org.jsoup.select.Selector.SelectorParseException) return "CATALOG_PARSER";
         }
@@ -31,6 +33,22 @@ final class NetworkDiagnostics {
         if (code.startsWith("HTTP_5")) return "Ошибка сервера сайта. Можно повторить позже.";
         if (code.startsWith("CATALOG_")) return "Сайт ответил, но список выпусков не удалось разобрать. Подробности — в настройках.";
         return "Не удалось получить данные сайта. Подробности — в настройках.";
+    }
+    /** Play errors must identify the failed stage, not always blame the TV connection. */
+    static String playbackSummary(Throwable error) {
+        if (error instanceof CatalogRepository.ExternalVideoException) return error.getMessage();
+        String code = code(error);
+        String message;
+        if (code.equals("HTTPS_TLS")) message = "Ошибка защищённого соединения с видеосайтом.";
+        else if (code.equals("DNS") || code.equals("CONNECT")) message = "Не удалось подключиться к серверу видео.";
+        else if (code.equals("TIMEOUT")) message = "Сервер видео не ответил вовремя.";
+        else if (code.equals("HTTP_403") || code.equals("HTTP_451"))
+            message = "Видеосервис ограничил доступ к выпуску.";
+        else if (code.startsWith("HTTP_5")) message = "Ошибка на сервере видеосервиса.";
+        else if (code.equals("PLAYER_NOT_FOUND")) message = "На сайте изменился плеер или он недоступен.";
+        else if (code.equals("STREAM_NOT_FOUND")) message = "Видеоплеер не предоставил ссылку на выпуск.";
+        else message = "Не удалось получить или воспроизвести выпуск.";
+        return message + "\nКод: " + code + ". Открой «Причина ошибки».";
     }
     static void save(Context context, String stage, Throwable error) {
         String version = "";

@@ -18,7 +18,7 @@ import java.util.regex.Pattern;
 public final class CatalogRepository {
     public static final String SHOW_URL = Show.MAMA.url();
     private static final Pattern EPISODE = Pattern.compile("(\\d+)\\s*сезон\\s*(\\d+)\\s*серия", Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
-    private static final Pattern SOURCE = Pattern.compile("[\"']source[\"']\\s*:\\s*[\"']([^\"']+)[\"']");
+    private static final Pattern SOURCE = Pattern.compile("[\"'](?:source|src)[\"']\\s*:\\s*[\"']([^\"']+)[\"']");
 
     public static final class Episode {
         public final int season, number;
@@ -134,10 +134,12 @@ public final class CatalogRepository {
     }
 
     static String parsePlayerUrl(Document page) throws IOException {
-        for (Element frame : page.select("iframe[src]")) {
-            String playerUrl = frame.absUrl("src");
-            if (!isMediaUrl(playerUrl)) continue;
-            return playerUrl;
+        // The site's embedded player may be lazy-loaded. Read only trusted Media1 URLs.
+        for (Element frame : page.select("iframe[src], iframe[data-src], iframe[data-lazy-src]")) {
+            for (String attribute : new String[]{"src", "data-src", "data-lazy-src"}) {
+                String playerUrl = frame.absUrl(attribute);
+                if (isMediaUrl(playerUrl)) return playerUrl;
+            }
         }
         for (Element link : page.select(".project__frame a[href]")) {
             try {
@@ -146,9 +148,15 @@ public final class CatalogRepository {
                     throw new ExternalVideoException("Этот выпуск на сайте доступен через Иви.\nВстроенное видео пока недоступно.");
             } catch (IllegalArgumentException ignored) { }
         }
-        throw new IOException("У этой серии другой плеер или видео пока недоступно.");
+        throw new PlayerUnavailableException("На странице выпуска не найден поддерживаемый плеер Media1.");
     }
 
+    static final class PlayerUnavailableException extends IOException {
+        PlayerUnavailableException(String message) { super(message); }
+    }
+    static final class StreamUnavailableException extends IOException {
+        StreamUnavailableException(String message) { super(message); }
+    }
     static final class CatalogException extends IOException {
         CatalogException(String message) { super(message); }
     }
@@ -162,7 +170,7 @@ public final class CatalogRepository {
             String url = match.group(1).replace("\\/", "/").replace("\\u0026", "&");
             if (isMediaUrl(url) && URI.create(url).getPath().endsWith(".m3u8")) return url;
         }
-        throw new IOException("Плеер не выдал поддерживаемый видеопоток.");
+        throw new StreamUnavailableException("В плеере Media1 не найден HLS-поток.");
     }
 
     private Document fetch(String url) throws IOException {

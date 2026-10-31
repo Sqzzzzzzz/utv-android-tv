@@ -66,7 +66,7 @@ public final class PlaybackActivity extends Activity {
     private Show show;
     private LinearLayout messagePanel, endPanel;
     private TextView status, heading, hint;
-    private Button retry;
+    private Button retry, diagnostics;
     private String episodeUrl, title, nextUrl, nextTitle;
     private int generation;
     private boolean active, resumed, pausedByLifecycle, completed;
@@ -193,6 +193,11 @@ public final class PlaybackActivity extends Activity {
         retry.setOnClickListener(v -> startPlayback());
         LinearLayout.LayoutParams buttonLp = new LinearLayout.LayoutParams(dp(260), dp(48));
         buttonLp.topMargin = dp(20); messagePanel.addView(retry, buttonLp);
+        diagnostics = TvUi.button(this, "Причина ошибки");
+        diagnostics.setVisibility(View.GONE);
+        diagnostics.setOnClickListener(v -> NetworkDiagnostics.show(this));
+        LinearLayout.LayoutParams diagnosticLp = new LinearLayout.LayoutParams(dp(260), dp(44));
+        diagnosticLp.topMargin = dp(10); messagePanel.addView(diagnostics, diagnosticLp);
         Button back = TvUi.button(this, "Вернуться к сериям"); back.setOnClickListener(v -> finish());
         LinearLayout.LayoutParams backLp = new LinearLayout.LayoutParams(dp(260), dp(48));
         backLp.topMargin = dp(10); messagePanel.addView(back, backLp);
@@ -234,7 +239,7 @@ public final class PlaybackActivity extends Activity {
         int request = ++generation;
         releasePlayer(); endPanel.setVisibility(View.GONE);
         playerView.setUseController(false);
-        messagePanel.setVisibility(View.VISIBLE); retry.setVisibility(View.GONE);
+        messagePanel.setVisibility(View.VISIBLE); retry.setVisibility(View.GONE); diagnostics.setVisibility(View.GONE);
         status.setText("Получаем видео…");
         focusPanel(messagePanel); updateKeepScreenOn();
         network.execute(() -> {
@@ -261,7 +266,7 @@ public final class PlaybackActivity extends Activity {
                         @Override public void onPlayerError(PlaybackException error) {
                             android.util.Log.w("UTVRemote", "Playback failed", error);
                             NetworkDiagnostics.save(PlaybackActivity.this, "Плеер: " + title, error);
-                            showError("Не удалось воспроизвести видео.\nПроверь интернет или попробуй другой выпуск.");
+                            showError(NetworkDiagnostics.playbackSummary(error));
                         }
                     });
                     MediaItem item = new MediaItem.Builder().setUri(stream).setMimeType(MimeTypes.APPLICATION_M3U8).build();
@@ -271,12 +276,11 @@ public final class PlaybackActivity extends Activity {
                     status.setText("Загружаем выпуск…"); updateKeepScreenOn();
                 });
             } catch (Exception ex) {
-                android.util.Log.w("UTVRemote", "Stream resolution failed", ex);
-                NetworkDiagnostics.save(this, "Видео: " + title, ex);
                 runOnUiThread(() -> {
                     if (!active || isDestroyed() || request != generation) return;
-                    showError(ex instanceof CatalogRepository.ExternalVideoException ? ex.getMessage()
-                            : "Серия пока недоступна.\nПроверь подключение и попробуй снова.");
+                    android.util.Log.w("UTVRemote", "Stream resolution failed", ex);
+                    NetworkDiagnostics.save(this, "Видео: " + title, ex);
+                    showError(NetworkDiagnostics.playbackSummary(ex));
                 });
             }
         });
@@ -332,7 +336,8 @@ public final class PlaybackActivity extends Activity {
         rememberPlayback();
         if (player != null) player.pause();
         playerView.setUseController(false);
-        status.setText(text); messagePanel.setVisibility(View.VISIBLE); retry.setVisibility(View.VISIBLE);
+        status.setText(text); messagePanel.setVisibility(View.VISIBLE);
+        retry.setVisibility(View.VISIBLE); diagnostics.setVisibility(View.VISIBLE);
         focusPanel(messagePanel); updateKeepScreenOn();
     }
     private void rememberPlayback() {

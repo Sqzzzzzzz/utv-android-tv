@@ -66,6 +66,19 @@ public final class PlaybackActivityTest {
                     throw new AssertionError("Unexpected player method: " + method.getName());
                 });
     }
+    @Test public void retryPanelExposesSavedErrorDetailsOnTheTelevision() {
+        ActivityController<PlaybackActivity> controller = create(null);
+        try {
+            PlaybackActivity activity = controller.get();
+            Button details = ReflectionHelpers.getField(activity, "diagnostics");
+            assertEquals(View.GONE, details.getVisibility());
+            ReflectionHelpers.callInstanceMethod(activity, "showError",
+                    ReflectionHelpers.ClassParameter.from(String.class, "Тестовая ошибка"));
+            assertEquals(View.VISIBLE, details.getVisibility());
+            assertEquals(View.VISIBLE, ((Button) ReflectionHelpers.getField(activity, "retry")).getVisibility());
+            assertTrue(details.getText().toString().contains("Причина ошибки"));
+        } finally { controller.stop().destroy(); }
+    }
     @Test public void savesSeekPositionWhileBuffering() {
         prefs().edit().clear().putLong("position:" + URL, 180000).commit();
         ActivityController<PlaybackActivity> controller = create(null);
@@ -169,7 +182,8 @@ public final class PlaybackActivityTest {
             PlaybackActivity activity = controller.get();
             LinearLayout panel = ReflectionHelpers.getField(activity, "messagePanel");
             PlayerView video = ReflectionHelpers.getField(activity, "playerView");
-            Button back = (Button) panel.getChildAt(2);
+            Button back = (Button) panel.getChildAt(3);
+            Button diagnostics = ReflectionHelpers.getField(activity, "diagnostics");
             assertFalse(video.getUseController());
             android.widget.TextView hint = ReflectionHelpers.getField(activity, "hint");
             assertTrue(hint.getText().toString().contains("нажать кнопку"));
@@ -179,8 +193,10 @@ public final class PlaybackActivityTest {
             Button retry = ReflectionHelpers.getField(activity, "retry");
             assertTrue(hint.getText().toString().contains("нажать кнопку"));
             assertSame(retry, retry.focusSearch(View.FOCUS_UP));
-            assertSame(back, retry.focusSearch(View.FOCUS_DOWN));
-            assertSame(retry, back.focusSearch(View.FOCUS_UP));
+            assertSame(diagnostics, retry.focusSearch(View.FOCUS_DOWN));
+            assertSame(retry, diagnostics.focusSearch(View.FOCUS_UP));
+            assertSame(back, diagnostics.focusSearch(View.FOCUS_DOWN));
+            assertSame(diagnostics, back.focusSearch(View.FOCUS_UP));
             assertSame(back, back.focusSearch(View.FOCUS_DOWN));
         } finally { controller.pause().stop().destroy(); }
     }
