@@ -79,6 +79,26 @@ public final class PlaybackActivityTest {
             assertTrue(details.getText().toString().contains("Причина ошибки"));
         } finally { controller.stop().destroy(); }
     }
+    @Test public void officialFallbackOpensTheExactEpisodeInTvBrowser() {
+        ActivityController<PlaybackActivity> controller = create(null);
+        try {
+            PlaybackActivity activity = controller.get();
+            Button official = ReflectionHelpers.getField(activity, "officialSite");
+            assertEquals(View.GONE, official.getVisibility());
+            ReflectionHelpers.callInstanceMethod(activity, "showError",
+                    ReflectionHelpers.ClassParameter.from(String.class, "Плеер не найден"));
+            assertEquals(View.VISIBLE, official.getVisibility());
+            assertTrue(official.performClick());
+            Intent opened = org.robolectric.Shadows.shadowOf(activity).getNextStartedActivity();
+            assertNotNull(opened);
+            assertEquals(Intent.ACTION_VIEW, opened.getAction());
+            assertEquals(URL, opened.getDataString());
+            assertTrue(opened.hasCategory(Intent.CATEGORY_BROWSABLE));
+            ReflectionHelpers.setField(activity, "episodeUrl", "https://evil.example/shows/mama-v-16/episodes/1/");
+            assertTrue(official.performClick());
+            assertNull(org.robolectric.Shadows.shadowOf(activity).getNextStartedActivity());
+        } finally { controller.stop().destroy(); }
+    }
     @Test public void savesSeekPositionWhileBuffering() {
         prefs().edit().clear().putLong("position:" + URL, 180000).commit();
         ActivityController<PlaybackActivity> controller = create(null);
@@ -182,7 +202,8 @@ public final class PlaybackActivityTest {
             PlaybackActivity activity = controller.get();
             LinearLayout panel = ReflectionHelpers.getField(activity, "messagePanel");
             PlayerView video = ReflectionHelpers.getField(activity, "playerView");
-            Button back = (Button) panel.getChildAt(3);
+            Button back = (Button) panel.getChildAt(4);
+            Button official = ReflectionHelpers.getField(activity, "officialSite");
             Button diagnostics = ReflectionHelpers.getField(activity, "diagnostics");
             assertFalse(video.getUseController());
             android.widget.TextView hint = ReflectionHelpers.getField(activity, "hint");
@@ -193,8 +214,10 @@ public final class PlaybackActivityTest {
             Button retry = ReflectionHelpers.getField(activity, "retry");
             assertTrue(hint.getText().toString().contains("нажать кнопку"));
             assertSame(retry, retry.focusSearch(View.FOCUS_UP));
-            assertSame(diagnostics, retry.focusSearch(View.FOCUS_DOWN));
-            assertSame(retry, diagnostics.focusSearch(View.FOCUS_UP));
+            assertSame(official, retry.focusSearch(View.FOCUS_DOWN));
+            assertSame(retry, official.focusSearch(View.FOCUS_UP));
+            assertSame(diagnostics, official.focusSearch(View.FOCUS_DOWN));
+            assertSame(official, diagnostics.focusSearch(View.FOCUS_UP));
             assertSame(back, diagnostics.focusSearch(View.FOCUS_DOWN));
             assertSame(diagnostics, back.focusSearch(View.FOCUS_UP));
             assertSame(back, back.focusSearch(View.FOCUS_DOWN));
