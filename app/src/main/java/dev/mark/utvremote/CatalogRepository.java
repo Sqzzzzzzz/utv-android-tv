@@ -18,7 +18,7 @@ import java.util.regex.Pattern;
 public final class CatalogRepository {
     public static final String SHOW_URL = Show.MAMA.url();
     private static final Pattern EPISODE = Pattern.compile("(\\d+)\\s*сезон\\s*(\\d+)\\s*серия", Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
-    private static final Pattern SOURCE = Pattern.compile("[\\\"'](?:source|src)[\\\"']\\s*:\\s*[\\\"']([^\\\"']+)[\\\"']");
+    private static final Pattern SOURCE = Pattern.compile("[\"'](?:source|src)[\"']\\s*:\\s*[\"']([^\"']+)[\"']");
 
     public static final class Episode {
         public final int season, number;
