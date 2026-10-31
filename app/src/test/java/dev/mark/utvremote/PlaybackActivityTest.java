@@ -66,6 +66,19 @@ public final class PlaybackActivityTest {
                     throw new AssertionError("Unexpected player method: " + method.getName());
                 });
     }
+    @Test public void retryPanelExposesSavedErrorDetailsOnTheTelevision() {
+        ActivityController<PlaybackActivity> controller = create(null);
+        try {
+            PlaybackActivity activity = controller.get();
+            Button details = ReflectionHelpers.getField(activity, "diagnostics");
+            assertEquals(View.GONE, details.getVisibility());
+            ReflectionHelpers.callInstanceMethod(activity, "showError",
+                    ReflectionHelpers.ClassParameter.from(String.class, "Тестовая ошибка"));
+            assertEquals(View.VISIBLE, details.getVisibility());
+            assertEquals(View.VISIBLE, ((Button) ReflectionHelpers.getField(activity, "retry")).getVisibility());
+            assertTrue(details.getText().toString().contains("Причина ошибки"));
+        } finally { controller.stop().destroy(); }
+    }
     @Test public void savesSeekPositionWhileBuffering() {
         prefs().edit().clear().putLong("position:" + URL, 180000).commit();
         ActivityController<PlaybackActivity> controller = create(null);
