@@ -66,7 +66,7 @@ public final class PlaybackActivity extends Activity {
     private Show show;
     private LinearLayout messagePanel, endPanel;
     private TextView status, heading, hint;
-    private Button retry, diagnostics;
+    private Button retry, diagnostics, officialSite;
     private String episodeUrl, title, nextUrl, nextTitle;
     private int generation;
     private boolean active, resumed, pausedByLifecycle, completed;
@@ -193,6 +193,11 @@ public final class PlaybackActivity extends Activity {
         retry.setOnClickListener(v -> startPlayback());
         LinearLayout.LayoutParams buttonLp = new LinearLayout.LayoutParams(dp(260), dp(48));
         buttonLp.topMargin = dp(20); messagePanel.addView(retry, buttonLp);
+        officialSite = TvUi.button(this, "Смотреть на сайте Ю");
+        officialSite.setVisibility(View.GONE);
+        officialSite.setOnClickListener(v -> openOfficialEpisode());
+        LinearLayout.LayoutParams siteLp = new LinearLayout.LayoutParams(dp(260), dp(44));
+        siteLp.topMargin = dp(10); messagePanel.addView(officialSite, siteLp);
         diagnostics = TvUi.button(this, "Причина ошибки");
         diagnostics.setVisibility(View.GONE);
         diagnostics.setOnClickListener(v -> NetworkDiagnostics.show(this));
@@ -232,6 +237,20 @@ public final class PlaybackActivity extends Activity {
         setContentView(root);
     }
 
+    /** Fall back to the same official episode that already works in the TV's browser.
+     *  Never pass an untrusted page or a direct media URL to another app. */
+    private void openOfficialEpisode() {
+        if (!CatalogRepository.isSitePage(episodeUrl)) return;
+        Intent browser = new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(episodeUrl));
+        browser.addCategory(Intent.CATEGORY_BROWSABLE);
+        try {
+            startActivity(browser);
+        } catch (android.content.ActivityNotFoundException | SecurityException ex) {
+            android.widget.Toast.makeText(this,
+                    "На телевизоре не удалось открыть браузер.", android.widget.Toast.LENGTH_LONG).show();
+        }
+    }
+
     private void startPlayback() {
         cancelAutoNext();
         cancelSeek(); hideTransport();
@@ -239,7 +258,8 @@ public final class PlaybackActivity extends Activity {
         int request = ++generation;
         releasePlayer(); endPanel.setVisibility(View.GONE);
         playerView.setUseController(false);
-        messagePanel.setVisibility(View.VISIBLE); retry.setVisibility(View.GONE); diagnostics.setVisibility(View.GONE);
+        messagePanel.setVisibility(View.VISIBLE); retry.setVisibility(View.GONE);
+        officialSite.setVisibility(View.GONE); diagnostics.setVisibility(View.GONE);
         status.setText("Получаем видео…");
         focusPanel(messagePanel); updateKeepScreenOn();
         network.execute(() -> {
@@ -337,7 +357,8 @@ public final class PlaybackActivity extends Activity {
         if (player != null) player.pause();
         playerView.setUseController(false);
         status.setText(text); messagePanel.setVisibility(View.VISIBLE);
-        retry.setVisibility(View.VISIBLE); diagnostics.setVisibility(View.VISIBLE);
+        retry.setVisibility(View.VISIBLE); officialSite.setVisibility(View.VISIBLE);
+        diagnostics.setVisibility(View.VISIBLE);
         focusPanel(messagePanel); updateKeepScreenOn();
     }
     private void rememberPlayback() {
