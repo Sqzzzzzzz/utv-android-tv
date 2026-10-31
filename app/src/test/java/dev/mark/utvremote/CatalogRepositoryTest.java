@@ -80,6 +80,27 @@ public final class CatalogRepositoryTest {
         assertEquals(12, episodes.size()); assertEquals(12, episodes.get(11).number);
         assertTrue(episodes.stream().allMatch(e -> Show.fromUrl(e.url) == Show.MAMENKIN));
     }
+    @Test public void lazyMedia1IframeIsAcceptedWithoutTrustingUnrelatedPlayers() throws Exception {
+        String media = "https://cdn.media1.ru/videos/episode?player_id=123";
+        String html = "<iframe src='https://foreign.example/player' data-src='" + media + "'></iframe>";
+        assertEquals(media, CatalogRepository.parsePlayerUrl(Jsoup.parse(html, BASE)));
+        String delayed = "<iframe data-lazy-src='" + media + "'></iframe>";
+        assertEquals(media, CatalogRepository.parsePlayerUrl(Jsoup.parse(delayed, BASE)));
+    }
+    @Test public void supportedPlayerAndMissingStreamHaveDistinctErrors() throws Exception {
+        try {
+            CatalogRepository.parsePlayerUrl(Jsoup.parse("<iframe src='https://foreign.example/video'></iframe>", BASE));
+            fail("A missing trusted player must be reported separately");
+        } catch (CatalogRepository.PlayerUnavailableException expected) { }
+        try {
+            CatalogRepository.parseStream("<html>empty player</html>");
+            fail("A missing HLS source must be reported separately");
+        } catch (CatalogRepository.StreamUnavailableException expected) { }
+    }
+    @Test public void playerSrcPropertyAlsoResolvesVerifiedHlsStream() throws Exception {
+        String stream = "https://cdn.media1.ru/videos/episode/master.m3u8?token=abc";
+        assertEquals(stream, CatalogRepository.parseStream("{\"src\":\"" + stream + "\"}"));
+    }
     @Test public void media1PlayerIsPreferredWhenOtherProviderLinksAreAlsoPresent() throws Exception {
         String player = "https://cdn.media1.ru/videos/example?player_id=1241&ad_id=935";
         String html = "<div class='project__frame'><a href='https://www.ivi.ru/watch/example/1'>Иви</a></div>"
