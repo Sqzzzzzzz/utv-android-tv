@@ -134,11 +134,15 @@ public final class CatalogRepository {
     }
 
     static String parsePlayerUrl(Document page) throws IOException {
-        // The site's embedded player may be lazy-loaded. Read only trusted Media1 URLs.
+        // The site now uses EdgePlayer containers as well as legacy/lazy iframes.
+        for (Element container : page.select("[data-edge-player]")) {
+            String playerUrl = container.absUrl("data-edge-player");
+            if (isPlayerUrl(playerUrl)) return playerUrl;
+        }
         for (Element frame : page.select("iframe[src], iframe[data-src], iframe[data-lazy-src]")) {
             for (String attribute : new String[]{"src", "data-src", "data-lazy-src"}) {
                 String playerUrl = frame.absUrl(attribute);
-                if (isMediaUrl(playerUrl)) return playerUrl;
+                if (isPlayerUrl(playerUrl)) return playerUrl;
             }
         }
         for (Element link : page.select(".project__frame a[href]")) {
@@ -179,6 +183,15 @@ public final class CatalogRepository {
 
     static boolean isSitePage(String url) {
         return Show.fromUrl(url) != null;
+    }
+    static boolean isPlayerUrl(String url) {
+        try {
+            URI uri = URI.create(url);
+            return "https".equals(uri.getScheme())
+                    && ("cdn.media1.ru".equals(uri.getHost()) || "media.u-tv.ru".equals(uri.getHost()))
+                    && uri.getUserInfo() == null && (uri.getPort() == -1 || uri.getPort() == 443)
+                    && uri.getFragment() == null && uri.getPath().startsWith("/videos/");
+        } catch (IllegalArgumentException ex) { return false; }
     }
     static boolean isMediaUrl(String url) {
         try {
