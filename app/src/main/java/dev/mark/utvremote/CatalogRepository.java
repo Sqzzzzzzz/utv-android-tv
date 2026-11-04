@@ -134,6 +134,12 @@ public final class CatalogRepository {
     }
 
     static String parsePlayerUrl(Document page) throws IOException {
+        // Current site markup uses a div; older episodes may still embed an iframe.
+        for (Element player : page.select("[data-edge-player]")) {
+            // Validate the declared absolute URL; jsoup's absUrl can discard user info.
+            String playerUrl = player.attr("data-edge-player");
+            if (isMediaUrl(playerUrl)) return playerUrl;
+        }
         // The site's embedded player may be lazy-loaded. Read only trusted Media1 URLs.
         for (Element frame : page.select("iframe[src], iframe[data-src], iframe[data-lazy-src]")) {
             for (String attribute : new String[]{"src", "data-src", "data-lazy-src"}) {
@@ -183,7 +189,8 @@ public final class CatalogRepository {
     static boolean isMediaUrl(String url) {
         try {
             URI uri = URI.create(url);
-            return "https".equals(uri.getScheme()) && "cdn.media1.ru".equals(uri.getHost())
+            return "https".equals(uri.getScheme())
+                    && ("cdn.media1.ru".equals(uri.getHost()) || "media.u-tv.ru".equals(uri.getHost()))
                     && uri.getUserInfo() == null && (uri.getPort() == -1 || uri.getPort() == 443)
                     && uri.getPath().startsWith("/videos/");
         } catch (IllegalArgumentException ex) { return false; }

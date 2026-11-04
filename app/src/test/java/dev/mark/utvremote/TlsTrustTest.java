@@ -67,7 +67,7 @@ public final class TlsTrustTest {
             assertFalse((boolean)ReflectionHelpers.callInstanceMethod(domain,"isCleartextTrafficPermitted"));
             assertTrue(host,hasResourceCa(domain));
         }
-        for(String host:Arrays.asList("example.com","u-tv.ru.evil.example","other.u-tv.ru","cdn.media1.ru","media1.ru","sub.cdn.media1.ru")) {
+        for(String host:Arrays.asList("example.com","u-tv.ru.evil.example","other.u-tv.ru","media.u-tv.ru","cdn.media1.ru","media1.ru","sub.cdn.media1.ru")) {
             Object domain=ReflectionHelpers.callInstanceMethod(config,"getConfigForHostname",ReflectionHelpers.ClassParameter.from(String.class,host));
             assertFalse((boolean)ReflectionHelpers.callInstanceMethod(domain,"isCleartextTrafficPermitted"));
             assertFalse(host,hasResourceCa(domain));

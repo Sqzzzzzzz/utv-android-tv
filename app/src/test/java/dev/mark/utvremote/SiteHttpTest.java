@@ -64,6 +64,17 @@ public final class SiteHttpTest {
             assertTrue(first.disconnected);assertFalse(second.disconnected);
         }
     }
+    @Test public void acceptsOfficialEdgePlayerRedirectWithoutAllowingOtherHostsOrPaths() throws Exception {
+        Response first = new Response(), second = new Response();
+        first.status = 302; first.redirect = "https://media.u-tv.ru/videos/83914_example?player_id=1241";
+        assertTrue(SiteHttp.fetch(url(Arrays.asList(first, second))).text().contains("серия"));
+        assertTrue(first.disconnected); assertTrue(second.disconnected);
+        for (String untrusted : Arrays.asList("https://media.u-tv.ru.evil.example/videos/1",
+                "http://media.u-tv.ru/videos/1", "https://user@media.u-tv.ru/videos/1",
+                "https://media.u-tv.ru:444/videos/1", "https://media.u-tv.ru/other/1")) {
+            assertFalse(untrusted, SiteHttp.allowed(new URL(untrusted)));
+        }
+    }
     @Test public void redirectLoopsAreBounded() throws Exception {
         List<Response> responses=new ArrayList<>();
         for(int i=0;i<6;i++){Response r=new Response();r.status=302;r.redirect="?again="+i;responses.add(r);}

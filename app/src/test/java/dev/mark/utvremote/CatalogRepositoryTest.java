@@ -87,6 +87,24 @@ public final class CatalogRepositoryTest {
         String delayed = "<iframe data-lazy-src='" + media + "'></iframe>";
         assertEquals(media, CatalogRepository.parsePlayerUrl(Jsoup.parse(delayed, BASE)));
     }
+    @Test public void currentEdgePlayerDivResolvesTheOfficialMediaHostAndDecodesQuery() throws Exception {
+        String player = "https://media.u-tv.ru/videos/83914_example?player_id=1241&ad_id=935&extid=";
+        String html = "<div id='gplayer' data-edge-player='" + player.replace("&", "&amp;") + "'></div>";
+        assertEquals(player, CatalogRepository.parsePlayerUrl(Jsoup.parse(html, BASE)));
+        String stream = "https://cdn.media1.ru/videos/83914_example/master.m3u8";
+        assertEquals(stream, CatalogRepository.parseStream("options.multisources = [{\"source\":\"" + stream + "\"}];"));
+    }
+    @Test public void edgePlayerRejectsUntrustedUrlsAndFallsBackToLegacyIframe() throws Exception {
+        String legacy = "https://cdn.media1.ru/videos/legacy?player_id=1241";
+        for (String untrusted : new String[]{
+                "https://media.u-tv.ru.evil.example/videos/1", "http://media.u-tv.ru/videos/1",
+                "https://user@media.u-tv.ru/videos/1", "https://media.u-tv.ru:444/videos/1",
+                "https://media.u-tv.ru/other/1"}) {
+            assertFalse(untrusted, CatalogRepository.isMediaUrl(untrusted));
+            String html = "<div data-edge-player='" + untrusted + "'></div><iframe src='" + legacy + "'></iframe>";
+            assertEquals(legacy, CatalogRepository.parsePlayerUrl(Jsoup.parse(html, BASE)));
+        }
+    }
     @Test public void supportedPlayerAndMissingStreamHaveDistinctErrors() throws Exception {
         try {
             CatalogRepository.parsePlayerUrl(Jsoup.parse("<iframe src='https://foreign.example/video'></iframe>", BASE));
