@@ -12,7 +12,7 @@ final class SiteHttp {
     private static final int MAX_HTML = 3 * 1024 * 1024;
     static final String USER_AGENT = "Mozilla/5.0 (Linux; Android 10; Android TV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
     static boolean allowed(URL url) {
-        return "https".equals(url.getProtocol()) && ("www.u-tv.ru".equals(url.getHost()) || "u-tv.ru".equals(url.getHost()) || "cdn.media1.ru".equals(url.getHost()))
+        return "https".equals(url.getProtocol()) && ("www.u-tv.ru".equals(url.getHost()) || "u-tv.ru".equals(url.getHost()) || "cdn.media1.ru".equals(url.getHost()) || "media.u-tv.ru".equals(url.getHost()))
                 && url.getUserInfo() == null && (url.getPort() == -1 || url.getPort() == 443);
     }
     static Document fetch(URL original) throws IOException {

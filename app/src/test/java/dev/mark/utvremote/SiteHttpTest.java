@@ -81,4 +81,11 @@ public final class SiteHttpTest {
         try{SiteHttp.fetch(url(Collections.singletonList(r)));fail();}catch(SocketTimeoutException expected){ }
         assertTrue(r.disconnected);
     }
+    @Test public void edgePlayerHostIsExplicitlyAllowedButLookalikesAreNot() throws Exception {
+        assertTrue(SiteHttp.allowed(new URL("https://media.u-tv.ru/videos/example")));
+        for(String url:Arrays.asList("http://media.u-tv.ru/videos/a","https://media.u-tv.ru.evil.test/videos/a",
+                "https://user@media.u-tv.ru/videos/a","https://media.u-tv.ru:8443/videos/a"))
+            assertFalse(url,SiteHttp.allowed(new URL(url)));
+    }
+
 }

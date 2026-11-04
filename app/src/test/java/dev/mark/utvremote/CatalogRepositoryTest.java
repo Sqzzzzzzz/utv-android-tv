@@ -131,4 +131,24 @@ public final class CatalogRepositoryTest {
         CatalogRepository.parsePoster(Jsoup.parse("<meta name='og:image' content='https://foreign.test/a.png'>"));
     }
 
+    @Test public void currentEdgePlayerContainerPreservesEscapedQueryAndResolvesHls() throws Exception {
+        String player="https://media.u-tv.ru/videos/83914_XlCCnaReznJkmXU?player_id=1241&ad_id=1379&extid=";
+        String html="<div class='project__frame'><div id='gplayer' data-edge-player='"+player.replace("&","&amp;")+"'></div></div>";
+        assertEquals(player,CatalogRepository.parsePlayerUrl(Jsoup.parse(html,BASE)));
+        String hls="https://cdn.media1.ru/videos/83914_XlCCnaReznJkmXU/master.m3u8";
+        assertEquals(hls,CatalogRepository.parseStream("{\"source\":\""+hls+"\"}"));
+        assertFalse(CatalogRepository.isMediaUrl(player));
+    }
+    @Test public void edgePlayerRejectsUnsafeAddressesAndCanUseLegacyFallback() throws Exception {
+        for(String invalid:new String[]{"http://media.u-tv.ru/videos/a","https://media.u-tv.ru.evil.test/videos/a",
+                "https://user@media.u-tv.ru/videos/a","https://media.u-tv.ru:8443/videos/a",
+                "https://media.u-tv.ru/other/a","https://media.u-tv.ru/videos/a#fragment"}) {
+            assertFalse(invalid,CatalogRepository.isPlayerUrl(invalid));
+            try{CatalogRepository.parsePlayerUrl(Jsoup.parse("<div data-edge-player='"+invalid+"'></div>",BASE));fail(invalid);}
+            catch(CatalogRepository.PlayerUnavailableException expected){}
+        }
+        String old="https://cdn.media1.ru/videos/legacy";
+        assertEquals(old,CatalogRepository.parsePlayerUrl(Jsoup.parse("<div data-edge-player='https://foreign.test/videos/a'></div><iframe src='"+old+"'></iframe>",BASE)));
+    }
+
 }

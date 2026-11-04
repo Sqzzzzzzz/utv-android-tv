@@ -134,11 +134,15 @@ public final class CatalogRepository {
     }
 
     static String parsePlayerUrl(Document page) throws IOException {
-        // The site's embedded player may be lazy-loaded. Read only trusted Media1 URLs.
+        // The site now uses EdgePlayer containers as well as legacy/lazy iframes.
+        for (Element container : page.select("[data-edge-player]")) {
+            String playerUrl = playerAddress(container, "data-edge-player");
+            if (isPlayerUrl(playerUrl)) return playerUrl;
+        }
         for (Element frame : page.select("iframe[src], iframe[data-src], iframe[data-lazy-src]")) {
             for (String attribute : new String[]{"src", "data-src", "data-lazy-src"}) {
-                String playerUrl = frame.absUrl(attribute);
-                if (isMediaUrl(playerUrl)) return playerUrl;
+                String playerUrl = playerAddress(frame, attribute);
+                if (isPlayerUrl(playerUrl)) return playerUrl;
             }
         }
         for (Element link : page.select(".project__frame a[href]")) {
@@ -149,6 +153,13 @@ public final class CatalogRepository {
             } catch (IllegalArgumentException ignored) { }
         }
         throw new PlayerUnavailableException("На странице выпуска не найден поддерживаемый плеер Media1.");
+    }
+
+    // Jsoup absUrl strips URL credentials before returning them. Validate the
+    // original attribute resolved as a URI so userinfo cannot disappear first.
+    private static String playerAddress(Element element, String attribute) {
+        try { return URI.create(element.baseUri()).resolve(element.attr(attribute).trim()).toString(); }
+        catch (IllegalArgumentException ignored) { return ""; }
     }
 
     static final class PlayerUnavailableException extends IOException {
@@ -179,6 +190,15 @@ public final class CatalogRepository {
 
     static boolean isSitePage(String url) {
         return Show.fromUrl(url) != null;
+    }
+    static boolean isPlayerUrl(String url) {
+        try {
+            URI uri = URI.create(url);
+            return "https".equals(uri.getScheme())
+                    && ("cdn.media1.ru".equals(uri.getHost()) || "media.u-tv.ru".equals(uri.getHost()))
+                    && uri.getUserInfo() == null && (uri.getPort() == -1 || uri.getPort() == 443)
+                    && uri.getFragment() == null && uri.getPath().startsWith("/videos/");
+        } catch (IllegalArgumentException ex) { return false; }
     }
     static boolean isMediaUrl(String url) {
         try {
