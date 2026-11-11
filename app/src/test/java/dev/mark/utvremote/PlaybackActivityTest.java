@@ -135,6 +135,50 @@ public final class PlaybackActivityTest {
             assertFalse((boolean) ReflectionHelpers.getField(controller.get(), "playWhenReady"));
         } finally { controller.stop().destroy(); }
     }
+    @Test public void playerTimeoutRetriesOnceAndKeepsSavedPositionAndPause() {
+        prefs().edit().clear().putLong("position:" + URL, 185000).commit();
+        ActivityController<PlaybackActivity> controller = create(null).start().resume();
+        try {
+            PlaybackActivity activity = controller.get();
+            TestPlayer player = new TestPlayer();
+            player.state = Player.STATE_IDLE;
+            player.position = 0;
+            player.duration = androidx.media3.common.C.TIME_UNSET;
+            player.playing = false;
+            player.error = ExoPlaybackException.createForSource(new java.io.IOException("Timed out"),
+                    PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT);
+            ReflectionHelpers.setField(activity, "player", player.player);
+            int generation = ReflectionHelpers.getField(activity, "generation");
+            ReflectionHelpers.callInstanceMethod(activity, "handlePlayerError",
+                    ReflectionHelpers.ClassParameter.from(PlaybackException.class, player.error),
+                    ReflectionHelpers.ClassParameter.from(int.class, generation),
+                    ReflectionHelpers.ClassParameter.from(boolean.class, true));
+
+            OfflineExecutor network = ReflectionHelpers.getField(activity, "network");
+            Button retry = ReflectionHelpers.getField(activity, "retry");
+            assertEquals(2, network.requests);
+            assertEquals(View.GONE, retry.getVisibility());
+            assertEquals(185000, (long) ReflectionHelpers.getField(activity, "resumePosition"));
+            assertEquals(185000, prefs().getLong("position:" + URL, -1));
+            assertFalse((boolean) ReflectionHelpers.getField(activity, "playWhenReady"));
+
+            // A delayed callback from the released player cannot start another attempt.
+            ReflectionHelpers.callInstanceMethod(activity, "handlePlayerError",
+                    ReflectionHelpers.ClassParameter.from(PlaybackException.class, player.error),
+                    ReflectionHelpers.ClassParameter.from(int.class, generation),
+                    ReflectionHelpers.ClassParameter.from(boolean.class, true));
+            assertEquals(2, network.requests);
+            assertEquals(View.GONE, retry.getVisibility());
+
+            ReflectionHelpers.callInstanceMethod(activity, "handlePlayerError",
+                    ReflectionHelpers.ClassParameter.from(PlaybackException.class, player.error),
+                    ReflectionHelpers.ClassParameter.from(int.class, generation + 1),
+                    ReflectionHelpers.ClassParameter.from(boolean.class, false));
+            assertEquals(2, network.requests);
+            assertEquals(View.VISIBLE, retry.getVisibility());
+            assertTrue(prefs().getString("lastNetworkError", "").contains("Код: TIMEOUT"));
+        } finally { controller.pause().stop().destroy(); }
+    }
     @Test public void pausedStateSurvivesActivityRecreation() {
         prefs().edit().clear().commit();
         ActivityController<PlaybackActivity> controller = create(null);

@@ -92,4 +92,38 @@ public final class SiteHttpTest {
         try{SiteHttp.fetch(url(Collections.singletonList(r)));fail();}catch(SocketTimeoutException expected){ }
         assertTrue(r.disconnected);
     }
+    @Test public void playbackPageRetriesOneTimeoutAndClosesBothConnections() throws Exception {
+        Response first = new Response(), second = new Response();
+        first.failure = new SocketTimeoutException("Timed out");
+        assertTrue(SiteHttp.fetchPlaybackPage(url(Arrays.asList(first, second)), "Страница выпуска")
+                .text().contains("1 сезон"));
+        assertTrue(first.disconnected);
+        assertTrue(second.disconnected);
+    }
+    @Test public void playbackPageStopsAfterTwoTimeoutsAndReportsStage() throws Exception {
+        Response first = new Response(), second = new Response(), third = new Response();
+        first.failure = new SocketTimeoutException("Timed out");
+        second.failure = new SocketTimeoutException("Still timed out");
+        try {
+            SiteHttp.fetchPlaybackPage(url(Arrays.asList(first, second, third)), "Страница видеоплеера");
+            fail("Only one retry is allowed");
+        } catch (IOException error) {
+            assertTrue(error.getMessage().contains("Страница видеоплеера"));
+            assertSame(second.failure, error.getCause());
+        }
+        assertTrue(first.disconnected);
+        assertTrue(second.disconnected);
+        assertFalse(third.disconnected);
+    }
+    @Test public void playbackPageDoesNotRetryAnHttpRejection() throws Exception {
+        Response first = new Response(), second = new Response();
+        first.status = 403;
+        try {
+            SiteHttp.fetchPlaybackPage(url(Arrays.asList(first, second)), "Страница выпуска");
+            fail("HTTP rejections must be surfaced immediately");
+        } catch (HttpStatusException error) {
+            assertEquals(403, error.getStatusCode());
+        }
+        assertFalse(second.disconnected);
+    }
 }

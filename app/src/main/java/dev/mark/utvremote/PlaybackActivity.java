@@ -28,12 +28,14 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 @androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public final class PlaybackActivity extends Activity {
     private static final String PLAYBACK_HINT = "OK — пауза / пуск     ← → — перемотка     ↓ — управление     Menu — ещё     Назад — скрыть / каталог";
     private static final String DIALOG_HINT = "Стрелки — выбор     OK — нажать кнопку     Назад — каталог";
     private final ExecutorService network = Executors.newSingleThreadExecutor();
+    private Future<?> streamRequest;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private PlayerView playerView;
     private ExoPlayer player;
@@ -252,17 +254,22 @@ public final class PlaybackActivity extends Activity {
     }
 
     private void startPlayback() {
+        startPlayback(true);
+    }
+
+    private void startPlayback(boolean retryTimeout) {
         cancelAutoNext();
         cancelSeek(); hideTransport();
         rememberPlayback();
         int request = ++generation;
+        if (streamRequest != null) streamRequest.cancel(true);
         releasePlayer(); endPanel.setVisibility(View.GONE);
         playerView.setUseController(false);
         messagePanel.setVisibility(View.VISIBLE); retry.setVisibility(View.GONE);
         officialSite.setVisibility(View.GONE); diagnostics.setVisibility(View.GONE);
-        status.setText("Получаем видео…");
+        status.setText(retryTimeout ? "Получаем видео…" : "Повторно подключаемся к видео…");
         focusPanel(messagePanel); updateKeepScreenOn();
-        network.execute(() -> {
+        streamRequest = network.submit(() -> {
             try {
                 String stream = new CatalogRepository().resolveStream(episodeUrl);
                 runOnUiThread(() -> {
@@ -284,9 +291,8 @@ public final class PlaybackActivity extends Activity {
                         @Override public void onTracksChanged(androidx.media3.common.Tracks tracks) { applyQuality(); }
                         @Override public void onPlayWhenReadyChanged(boolean ready, int reason) { updateKeepScreenOn(); }
                         @Override public void onPlayerError(PlaybackException error) {
-                            android.util.Log.w("UTVRemote", "Playback failed", error);
-                            NetworkDiagnostics.save(PlaybackActivity.this, "Плеер: " + title, error);
-                            showError(NetworkDiagnostics.playbackSummary(error));
+                            // Let Media3 finish dispatching the error before replacing the player.
+                            handler.post(() -> handlePlayerError(error, request, retryTimeout));
                         }
                     });
                     MediaItem item = new MediaItem.Builder().setUri(stream).setMimeType(MimeTypes.APPLICATION_M3U8).build();
@@ -305,6 +311,18 @@ public final class PlaybackActivity extends Activity {
             }
         });
     }
+
+    private void handlePlayerError(PlaybackException error, int request, boolean retryTimeout) {
+        if (!active || isDestroyed() || request != generation) return;
+        android.util.Log.w("UTVRemote", "Playback failed", error);
+        if (retryTimeout && "TIMEOUT".equals(NetworkDiagnostics.code(error))) {
+            startPlayback(false);
+            return;
+        }
+        NetworkDiagnostics.save(this, "Плеер: " + title, error);
+        showError(NetworkDiagnostics.playbackSummary(error));
+    }
+
     private void handlePlaybackState(int state) {
         if (state == Player.STATE_READY && !completed) {
             if (messagePanel.getVisibility() == View.VISIBLE && retry.getVisibility() != View.VISIBLE) {
@@ -372,6 +390,8 @@ public final class PlaybackActivity extends Activity {
         if (state == Player.STATE_IDLE && player.getPlayerError() == null) return;
         long position = Math.max(0, player.getCurrentPosition());
         long duration = player.getDuration();
+        // A source failure before the timeline loads can report a placeholder position.
+        if (state == Player.STATE_IDLE && duration == C.TIME_UNSET && position == 0) return;
         // Only a real end counts as completed; pausing in the last seconds still resumes there.
         if (completed || state == Player.STATE_ENDED) position = 0;
         else if (duration != C.TIME_UNSET && duration > 0) position = Math.min(position, duration);
@@ -405,7 +425,9 @@ public final class PlaybackActivity extends Activity {
             else if (player != null && messagePanel.getVisibility() != View.VISIBLE) showTransport(false); }
     }
     @Override protected void onStop() {
-        active = false; ++generation; handler.removeCallbacks(progressTick); handler.removeCallbacks(hideTransport); handler.removeCallbacks(saveTick); savePosition(); releasePlayer(); super.onStop();
+        active = false; ++generation;
+        if (streamRequest != null) streamRequest.cancel(true);
+        handler.removeCallbacks(progressTick); handler.removeCallbacks(hideTransport); handler.removeCallbacks(saveTick); savePosition(); releasePlayer(); super.onStop();
     }
     @Override protected void onSaveInstanceState(Bundle state) {
         cancelSeek(); rememberPlayback();
@@ -498,7 +520,10 @@ public final class PlaybackActivity extends Activity {
         if(player==null)return;
         List<String> labels=new ArrayList<>();List<Runnable> actions=new ArrayList<>();
         labels.add("Качество");actions.add(()->chooseQuality());
-        labels.add("С начала");actions.add(()->{player.seekTo(0);player.play();showTransport(false);});
+        labels.add("С начала");actions.add(()->{
+            if (player == null) return;
+            player.seekTo(0);player.play();showTransport(false);
+        });
         String previous=adjacentEpisode(-1);
         if(previous!=null){labels.add("Предыдущая серия");actions.add(()->openEpisode(previous,watch.title(show,previous)));}
         if(nextUrl!=null){labels.add("Следующая серия");actions.add(()->openNext());}

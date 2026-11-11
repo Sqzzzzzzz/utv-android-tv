@@ -6,6 +6,7 @@ import org.jsoup.nodes.Element;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -129,8 +130,9 @@ public final class CatalogRepository {
 
     public String resolveStream(String episodeUrl) throws IOException {
         if (!isSitePage(episodeUrl)) throw new IOException("Неверный адрес серии.");
-        Document page = fetch(episodeUrl);
-        return parseStream(fetch(parsePlayerUrl(page)).html());
+        Document page = SiteHttp.fetchPlaybackPage(new URL(episodeUrl), "Страница выпуска");
+        URL playerUrl = new URL(parsePlayerUrl(page));
+        return parseStream(SiteHttp.fetchPlaybackPage(playerUrl, "Страница видеоплеера").html());
     }
 
     static String parsePlayerUrl(Document page) throws IOException {
@@ -180,7 +182,7 @@ public final class CatalogRepository {
     }
 
     private Document fetch(String url) throws IOException {
-        return SiteHttp.fetch(new java.net.URL(url));
+        return SiteHttp.fetch(new URL(url));
     }
 
     static boolean isSitePage(String url) {

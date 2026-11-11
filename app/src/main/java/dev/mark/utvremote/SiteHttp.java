@@ -16,6 +16,19 @@ final class SiteHttp {
                 || ("media.u-tv.ru".equals(url.getHost()) && url.getPath().startsWith("/videos/")))
                 && url.getUserInfo() == null && (url.getPort() == -1 || url.getPort() == 443);
     }
+
+    static Document fetchPlaybackPage(URL url, String stage) throws IOException {
+        try {
+            return fetch(url);
+        } catch (SocketTimeoutException first) {
+            try {
+                return fetch(url);
+            } catch (SocketTimeoutException second) {
+                throw new IOException(stage + ": сервер не ответил после повторного запроса.", second);
+            }
+        }
+    }
+
     static Document fetch(URL original) throws IOException {
         URL url = original;
         for (int redirects = 0; redirects < 6; redirects++) {
