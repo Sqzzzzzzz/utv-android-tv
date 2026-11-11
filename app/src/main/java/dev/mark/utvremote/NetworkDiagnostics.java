@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.os.Build;
+import androidx.media3.common.PlaybackException;
 import org.jsoup.HttpStatusException;
 import java.net.*;
 import javax.net.ssl.SSLException;
@@ -22,6 +23,9 @@ final class NetworkDiagnostics {
             if (e instanceof CatalogRepository.CatalogException) return "CATALOG_FORMAT";
             if (e instanceof org.jsoup.select.Selector.SelectorParseException) return "CATALOG_PARSER";
         }
+        if (error instanceof PlaybackException
+                && ((PlaybackException) error).errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT)
+            return "TIMEOUT";
         return "LOAD_ERROR";
     }
     static String summary(Throwable error) {
